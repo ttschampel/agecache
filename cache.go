@@ -71,6 +71,8 @@ type Config struct {
 	// to MaxAge. When less than MaxAge, uniformly distributed random jitter is
 	// added to the expiration time. If equal or zero, jitter is disabled.
 	MinAge time.Duration
+	// Optional duration for staleness
+	StaleAge time.Duration
 	// Type of key expiration: Passive or Active
 	ExpirationType ExpirationType
 	// For active expiration, how often to iterate over the keyspace. Defaults
@@ -95,6 +97,7 @@ type Cache struct {
 	capacity           int
 	minAge             time.Duration
 	maxAge             time.Duration
+	staleAge	   time.Duration
 	expirationType     ExpirationType
 	expirationInterval time.Duration
 	onEviction         func(key, value interface{})
@@ -137,7 +140,7 @@ func New(config Config) *Cache {
 	minAge := config.MinAge
 	if minAge == 0 {
 		minAge = config.MaxAge
-	}
+	}		
 
 	interval := config.ExpirationInterval
 	if interval <= 0 {
@@ -150,6 +153,7 @@ func New(config Config) *Cache {
 		capacity:           config.Capacity,
 		maxAge:             config.MaxAge,
 		minAge:             minAge,
+		staleDuration:	    config.StaleAge,
 		expirationType:     config.ExpirationType,
 		expirationInterval: interval,
 		onEviction:         config.OnEviction,
@@ -201,7 +205,7 @@ func (cache *Cache) Set(key, value interface{}) bool {
 // Get returns the value stored at `key`. The boolean value reports whether or
 // not the value was found. The OnExpiration callback is invoked if the value
 // had expired on access
-func (cache *Cache) Get(key interface{}) (interface{}, bool) {
+func (cache *Cache) Get(key interface{}) (interface{}, bool, bool) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
 
@@ -212,7 +216,7 @@ func (cache *Cache) Get(key interface{}) (interface{}, bool) {
 		if cache.maxAge == 0 || time.Since(entry.timestamp) <= cache.maxAge {
 			cache.evictionList.MoveToFront(element)
 			cache.hits++
-			return entry.value, true
+			return entry.value, true, time.Since(entry.timestamp) > cache.StaleAge
 		}
 
 		// Entry expired
@@ -221,11 +225,11 @@ func (cache *Cache) Get(key interface{}) (interface{}, bool) {
 		if cache.onExpiration != nil {
 			cache.onExpiration(entry.key, entry.value)
 		}
-		return nil, false
+		return nil, false, false
 	}
 
 	cache.misses++
-	return nil, false
+	return nil, false, false
 }
 
 // Has returns whether or not the `key` is in the cache without updating
