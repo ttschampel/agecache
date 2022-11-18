@@ -97,7 +97,7 @@ type Cache struct {
 	capacity           int
 	minAge             time.Duration
 	maxAge             time.Duration
-	staleAge	   time.Duration
+	staleAge	       time.Duration
 	expirationType     ExpirationType
 	expirationInterval time.Duration
 	onEviction         func(key, value interface{})
@@ -153,7 +153,7 @@ func New(config Config) *Cache {
 		capacity:           config.Capacity,
 		maxAge:             config.MaxAge,
 		minAge:             minAge,
-		staleDuration:	    config.StaleAge,
+		staleAge:	        config.StaleAge,
 		expirationType:     config.ExpirationType,
 		expirationInterval: interval,
 		onEviction:         config.OnEviction,
@@ -216,7 +216,7 @@ func (cache *Cache) Get(key interface{}) (interface{}, bool, bool) {
 		if cache.maxAge == 0 || time.Since(entry.timestamp) <= cache.maxAge {
 			cache.evictionList.MoveToFront(element)
 			cache.hits++
-			return entry.value, true, time.Since(entry.timestamp) > cache.StaleAge
+			return entry.value, true, time.Since(entry.timestamp) > cache.staleAge
 		}
 
 		// Entry expired
